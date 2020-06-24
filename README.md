@@ -5,12 +5,12 @@ base on [Gatys et al.](https://arxiv.org/abs/1508.06576) For those who want a co
 skill to do it on your own or someone who wants to prove the idea that "Machine can imagine?"
 
 <p align="center">
-    <img src="doc/Figure1-Gatys.png">
+    <img src="doc/Figure1-Gatys.png" width="416">
 </p>
-<p align="center" style="font-size:9px">
+<div align="center" style="font-size:9px">
     Gatys et al. algorithm it uses a pre-trained model to extract features from both content and style images on 
     specifies layers. then try to create a new image that contains features from both images by minimizing the loss.
-</p>
+</div>
 
 This application will let you play along with the algorithm and it parameters. You can choose which models, layers to 
 use as content-loss and style-loss or adjust the weights of each layer or channel. To see how these parameters affect
