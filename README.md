@@ -26,7 +26,7 @@ the transferring.
 
 ## Prerequisites
 
-** This still under development so there no executable program (for now?).
+** This still under development so there no executable program.
 
 - Python > 3.6
 - Pytorch > 1.3.1
