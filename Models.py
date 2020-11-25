@@ -37,6 +37,7 @@ def get_model_layers(cnn_name):
             layer = nn.ReLU(inplace=False)
         elif isinstance(layer, nn.MaxPool2d):
             name = 'pool_{}'.format(i)
+            layer = nn.AvgPool2d(kernel_size=2, stride=2, padding=0)
         elif isinstance(layer, nn.BatchNorm2d):
             name = 'bn_{}'.format(i)
         else:
@@ -73,8 +74,9 @@ class ContentLoss(nn.Module):
 
     def forward(self, inp):
         if inp.shape == self.target.shape:
-            self.loss = self.losser(inp, self.weighted(
-                self.target, self.ch_wt))
+            #self.loss = self.losser(inp, self.weighted(
+            #    self.target, self.ch_wt))
+            self.loss = self.losser(inp, self.target)
         return inp
 
 
@@ -99,8 +101,9 @@ class StyleLoss(nn.Module):
 
     def forward(self, inp):
         ft = self.pool(inp)
-        self.loss = self.losser(ft, self.weighted(
-            self.target, self.ch_wt))
+        #self.loss = self.losser(ft, self.weighted(
+        #    self.target, self.ch_wt))
+        self.loss = self.losser(ft, self.target)
         return inp
 
 
@@ -109,15 +112,15 @@ class StyleModel(nn.Module):
         super(StyleModel, self).__init__()
         self.device = device
 
-        mean = torch.tensor([0.485, 0.456, 0.406]).to(device)
+        """mean = torch.tensor([0.485, 0.456, 0.406]).to(device)
         std = torch.tensor([0.229, 0.224, 0.225]).to(device)
-        self.norm = Normalization(mean, std)
+        self.norm = Normalization(mean, std)"""
 
         self.layers = cnn_layers
         self.model = None
 
     def set_layers(self, content_layers, style_layers):
-        self.model = nn.Sequential(self.norm)
+        self.model = nn.Sequential()
         self.content_layers = content_layers
         self.content_losses = []
         self.style_layers = style_layers
@@ -139,7 +142,9 @@ class StyleModel(nn.Module):
         for i in range(len(self.model) - 1, -1, -1):
             if isinstance(self.model[i], ContentLoss) or isinstance(self.model[i], StyleLoss):
                 break
+
         self.model = self.model[:(i + 1)].to(self.device)
+        #self.model.add_module('sigmoid', nn.Sigmoid())
 
     def set_target(self, content_img, style_img):
         x = content_img
@@ -154,6 +159,7 @@ class StyleModel(nn.Module):
                 y = layer(y)
 
     def forward(self, inp):
+        #inp = self.norm(inp)
         self.model(inp)
 
 

@@ -33,7 +33,8 @@ def load_image(path, size=None, scale=None, keep_ratio=False):
     elif scale is not None:
         img = img.resize((int(img.size[0] / scale), int(img.size[1] / scale)),
                          Image.ANTIALIAS)
-    img = torch.tensor(np.array(img)).permute(2, 0, 1).float()
+    img = torch.tensor(np.array(img).transpose((2, 0, 1))).contiguous().float()
+
     return img
 
 

@@ -18,6 +18,7 @@ class ImageCanvas(tk.Frame):
                                 bg='black', name=c_name)
         #self.canvas.pack(side=tk.TOP, anchor=tk.NW, fill=tk.BOTH, expand=True)
         self.canvas.grid(row=1, column=0, sticky=tk.NSEW)
+        self.canvas.image = None
 
     def bind(self, sequence=None, func=None, add=None):
         self.canvas.bind(sequence, func, add)

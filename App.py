@@ -28,6 +28,7 @@ def get_monitor_from_coord(x, y):  # multiple monitor dealing.
     return monitors[0]
 
 
+# noinspection PyAttributeOutsideInit
 class Main(tk.Frame):
     def __init__(self, master):
         tk.Frame.__init__(self, master)
@@ -110,7 +111,7 @@ class Main(tk.Frame):
         self.entry_iter.insert(tk.END, '20')
 
         label_cw = tk.Label(self.frame_bottom, text='Content weight: ', bg='gray',
-                              font=('Times', 11))
+                            font=('Times', 11))
         label_cw.pack(padx=5, pady=5, side=tk.LEFT)
         self.entry_cw = tk.Entry(self.frame_bottom)
         self.entry_cw.pack(pady=5, side=tk.LEFT)
@@ -170,7 +171,9 @@ class Main(tk.Frame):
 
     def click_canvas(self, event):
         c_name = str(event.widget).split('.')[-1]
-        filename = tkfd.askopenfilename()
+        filename = tkfd.askopenfilename(initialdir='.', title='Select an Image.',
+                                        filetypes=(('JPG files', '*.jpg'), ('JPEG files', '*.jpeg'),
+                                                   ('PNG files', '*.png'), ("All files", "*.*")))
         if len(filename) > 0:
             img_size = Image.open(filename).size
             scale_img = smpd.askfloat(title='Scaling the image', prompt='Original size: {}'.format(img_size),
@@ -199,8 +202,7 @@ class Main(tk.Frame):
         if self.content is None:
             return
 
-        content_img = self.content.div(255.).unsqueeze(0)
-        self.output = torch.rand(content_img.shape).cuda()
+        self.output = torch.rand(self.content.unsqueeze(0).shape).cuda()
         self.optimizer = optim.LBFGS([self.output.requires_grad_()], lr=0.1)
 
         res = self.output.clone().detach().cpu().data.clamp(0, 1).squeeze(0).mul(255.)
@@ -275,7 +277,7 @@ class Main(tk.Frame):
 
             loss = optimizer.step(closure)
 
-            res = output.clone().detach().cpu().data.clamp(0, 1).squeeze(0).mul(255.)
+            res = output.clone().detach().cpu().data.clamp_(0, 1).squeeze(0).mul(255.)
             load_image2canvas(self.canvas_output.canvas, tensor2Image(res))
             self.canvas_output.canvas.update()
             #self.loss_label.update()
