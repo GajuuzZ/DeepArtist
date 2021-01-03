@@ -30,6 +30,7 @@ the transferring.
 
 - Python > 3.6
 - Pytorch > 1.7
+- screeninfo
 
 *** GPU >= GTX-1050
 
