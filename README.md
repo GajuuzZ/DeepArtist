@@ -26,18 +26,20 @@ the transferring.
 
 ## Prerequisites
 
-** This still under development so there no executable program.
+** This still under development so there no executable program (for now?).
 
 - Python > 3.6
-- Pytorch > 1.3.1
+- Pytorch > 1.7
 
-*** To run this program without wondering whether your computer is dead yet? you need a CUDA and powerful-GPU installed.
+*** GPU >= GTX-1050
 
-## Basic Use
+## User Manual
 
 1. Left-click on the content and style canvas to open image selection.
-2. Set before Transfer.
-3. Adjust the parameter (Iteration is how long to run).
+    - Rescale the image with a number to divide to reduce computation time but it will affect the result.
+    - Bigger images require more GPU memory!
+2. Adjust the parameter (Iteration is how long to run).
+3. Click Set then Transfer.
 4. Left-click on the outout to save the image.
 
 ** Right-click on the content or style canvas will open the feature channels window to adjust the weights for each 

@@ -7,6 +7,21 @@ import torchvision.transforms as transforms
 import torchvision.models as models
 
 
+def cal_hist(image):
+    n_pix = image.shape[-2] * image.shape[-1]
+    hist = torch.zeros((image.shape[0], 256), dtype=torch.float32)
+    for i in range(image.shape[0]):
+        hist[i] = torch.histc(image[0], 256, min=0.0, max=1.0) / n_pix
+    return hist
+
+
+def hist_loss(output, target):
+    output_hist = cal_hist(output)
+    target_hist = cal_hist(target)
+    loss = F.mse_loss(output_hist, target_hist, reduction='sum')
+    return loss
+
+
 def gram_matrix(inp):
     b, ch, h, w = inp.size()
     features = inp.view(b * ch, h * w)
@@ -48,14 +63,19 @@ def get_model_layers(cnn_name):
     return model, conv_layers
 
 
-class Normalization(nn.Module):
-    def __init__(self, mean, std):
-        super(Normalization, self).__init__()
+class Normalization:
+    def __init__(self, mean=None, std=None):
+        if mean is None and std is None:
+            mean = torch.tensor([0.485, 0.456, 0.406])
+            std = torch.tensor([0.229, 0.224, 0.225])
         self.mean = mean.view(-1, 1, 1)
         self.std = std.view(-1, 1, 1)
 
-    def forward(self, img):
+    def norm(self, img):
         return (img - self.mean) / self.std
+
+    def denorm(self, img):
+        return (img * self.std) + self.mean
 
 
 class ContentLoss(nn.Module):
@@ -112,10 +132,6 @@ class StyleModel(nn.Module):
         super(StyleModel, self).__init__()
         self.device = device
 
-        """mean = torch.tensor([0.485, 0.456, 0.406]).to(device)
-        std = torch.tensor([0.229, 0.224, 0.225]).to(device)
-        self.norm = Normalization(mean, std)"""
-
         self.layers = cnn_layers
         self.model = None
 
@@ -159,7 +175,6 @@ class StyleModel(nn.Module):
                 y = layer(y)
 
     def forward(self, inp):
-        #inp = self.norm(inp)
         self.model(inp)
 
 
@@ -171,14 +186,13 @@ if __name__ == '__main__':
     content_layers_default = ['conv_4']
     style_layers_default = ['conv_1', 'conv_2', 'conv_3', 'conv_4', 'conv_5']
 
-    mean = torch.tensor([0.485, 0.456, 0.406]).cuda()
-    std = torch.tensor([0.229, 0.224, 0.225]).cuda()
-    norm = Normalization(mean, std)
+    norm = Normalization()
 
     style_img = load_image('./style_images/shipwreck.jpg', size=512).div(255.).unsqueeze(0).cuda()
     content_img = load_image('./test.jpg', keep_ratio=True, size=512).div(255.).unsqueeze(0).cuda()
 
-    net = StyleModel('vgg19', norm, content_layers_default, style_layers_default)
+    net = StyleModel(get_model_layers('vgg19'))
+    net.set_layers(content_layers_default, style_layers_default)
     net.set_target(content_img, style_img)
 
     output = content_img.clone()

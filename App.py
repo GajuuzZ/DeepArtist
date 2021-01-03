@@ -1,4 +1,3 @@
-import os
 import time
 import torch
 import screeninfo
@@ -8,9 +7,10 @@ import tkinter.filedialog as tkfd
 import tkinter.simpledialog as smpd
 import torchvision.transforms as transforms
 from PIL import Image, ImageTk
+from cv2 import cvtColor, COLOR_RGB2YUV, COLOR_YUV2RGB
 
 import torch.optim as optim
-from Models import StyleModel, get_model_layers
+from Models import StyleModel, get_model_layers, hist_loss
 from Utils import load_image, tensor2Image, load_image2canvas
 
 from widgets import ImageCanvas
@@ -49,6 +49,8 @@ class Main(tk.Frame):
         self.net = StyleModel(layers)
         self.net.set_layers(self.content_layers, self.style_layers)
         self.seted = False
+
+        self.preserv_color = tk.BooleanVar(value=False)
 
         ### Widgets. ###
         menubar = tk.Menu(self.master)
@@ -89,6 +91,8 @@ class Main(tk.Frame):
                                 columnspan=2, rowspan=2)
         self.canvas_output.bind('<Button-1>', self.save_output)
         self.canvas_output.bind('<Button-3>', self.click_canvas)
+        tk.Checkbutton(self.canvas_output.panel_top, text='Preserv Color', variable=self.preserv_color,
+                       bg='gray', font=(None, 11)).pack(padx=5, side=tk.RIGHT)
         tk.Button(self.canvas_output.panel_top, text='Use Noise', font=(None, 9),
                   command=self.use_noise).pack(padx=5, side=tk.RIGHT)
 
@@ -194,8 +198,12 @@ class Main(tk.Frame):
                                            defaultextension='.jpg',
                                            filetypes=(('jpeg files', '*.jpg'), ('all files', '*.*')))
         if len(file_name) > 0:
-            image = self.output.clone().detach().cpu().data.clamp(0, 1).squeeze(0).mul(255.)
-            image = tensor2Image(image)
+            image = tensor2Image(self.output.clone().detach().cpu().data.clamp(0, 1).squeeze(0).mul(255.))
+            if self.preserv_color.get():
+                content_yuv = cvtColor(self.content.numpy().transpose((1, 2, 0)), COLOR_RGB2YUV)
+                yuv = cvtColor(np.array(image).astype('float32'), COLOR_RGB2YUV)
+                yuv[:, :, 1:3] = content_yuv[:, :, 1:3]
+                image = Image.fromarray(np.clip(cvtColor(yuv, COLOR_YUV2RGB), 0, 255).astype(np.uint8))
             image.save(file_name)
 
     def use_noise(self):
@@ -205,8 +213,8 @@ class Main(tk.Frame):
         self.output = torch.rand(self.content.unsqueeze(0).shape).cuda()
         self.optimizer = optim.LBFGS([self.output.requires_grad_()], lr=0.1)
 
-        res = self.output.clone().detach().cpu().data.clamp(0, 1).squeeze(0).mul(255.)
-        load_image2canvas(self.canvas_output.canvas, tensor2Image(res))
+        res = tensor2Image(self.output.clone().detach().cpu().data.clamp(0, 1).squeeze(0).mul(255.))
+        load_image2canvas(self.canvas_output.canvas, res)
         self.canvas_output.label['text'] = 'output | size: {}x{}'.format(self.output.shape[2], self.output.shape[3])
         self.run = 1
 
@@ -220,8 +228,8 @@ class Main(tk.Frame):
         self.output = content_img.clone()
         self.optimizer = optim.LBFGS([self.output.requires_grad_()], lr=0.1)
 
-        res = self.output.clone().detach().cpu().data.clamp(0, 1).squeeze(0).mul(255.)
-        load_image2canvas(self.canvas_output.canvas, tensor2Image(res))
+        res = tensor2Image(self.output.clone().detach().cpu().data.clamp(0, 1).squeeze(0).mul(255.))
+        load_image2canvas(self.canvas_output.canvas, res)
         self.canvas_output.label['text'] = 'output | size: {}x{}'.format(self.output.shape[2], self.output.shape[3])
         self.run = 1
         self.seted = True
@@ -230,6 +238,8 @@ class Main(tk.Frame):
         if self.content is None or self.style is None or not self.seted:
             return
         st = time.time()
+        if self.preserv_color.get():
+            content_yuv = cvtColor(self.content.numpy().transpose((1, 2, 0)), COLOR_RGB2YUV)
 
         output = self.output
         optimizer = self.optimizer
@@ -239,8 +249,6 @@ class Main(tk.Frame):
         cwl = [float(self.entry_cwls[ly].get()) for ly in list(self.entry_cwls.keys())]
         swl = [float(self.entry_swls[ly].get()) for ly in list(self.entry_swls.keys())]
 
-        #loadfn = load_image2canvas
-        #canvas = self.canvas_output
         label = self.loss_label
 
         itr = self.run + int(self.entry_iter.get())
@@ -263,7 +271,9 @@ class Main(tk.Frame):
                 content_loss *= cw
                 style_loss *= sw
 
-                loss = content_loss + style_loss
+                #loss_hist = hist_loss(output.squeeze(0).clamp(0, 1), self.content.div(255.).cuda())
+
+                loss = content_loss + style_loss  # + loss_hist
                 loss.backward()
 
                 """res = output.clone().detach().cpu().data.clamp_(0, 1).squeeze(0).mul(255.)
@@ -277,10 +287,13 @@ class Main(tk.Frame):
 
             loss = optimizer.step(closure)
 
-            res = output.clone().detach().cpu().data.clamp_(0, 1).squeeze(0).mul(255.)
-            load_image2canvas(self.canvas_output.canvas, tensor2Image(res))
+            res = tensor2Image(output.clone().detach().cpu().data.clamp_(0, 1).squeeze(0).mul(255.))
+            if self.preserv_color.get():
+                yuv = cvtColor(np.array(res).astype('float32'), COLOR_RGB2YUV)
+                yuv[:, :, 1:3] = content_yuv[:, :, 1:3]
+                res = Image.fromarray(np.clip(cvtColor(yuv, COLOR_YUV2RGB), 0, 255).astype(np.uint8))
+            load_image2canvas(self.canvas_output.canvas, res)
             self.canvas_output.canvas.update()
-            #self.loss_label.update()
             self.run += 1
 
         self.loss_label['text'] = 'Done. ' + self.loss_label['text']
