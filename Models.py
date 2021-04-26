@@ -82,7 +82,6 @@ class ContentLoss(nn.Module):
     def __init__(self, losser=F.mse_loss):
         super(ContentLoss, self).__init__()
         self.losser = losser
-        self.weighted = lambda x, w: x * w[None, :, None, None]
 
     def set_target(self, target):
         self.features = target.detach().cpu()
@@ -90,26 +89,24 @@ class ContentLoss(nn.Module):
         self.set_weight_channels(torch.ones([self.features.shape[1]]))
 
     def set_weight_channels(self, ch_wt):
-        self.ch_wt = ch_wt.to(self.target.device)
+        self.ch_wt = ch_wt.view(1, -1, 1, 1).to(self.target.device)
 
     def forward(self, inp):
         if inp.shape == self.target.shape:
-            #self.loss = self.losser(inp, self.weighted(
-            #    self.target, self.ch_wt))
-            self.loss = self.losser(inp, self.target)
+            self.loss = self.losser(inp, self.target * self.ch_wt)
+            #self.loss = self.losser(inp, self.target)
         return inp
 
 
 class StyleLoss(nn.Module):
     def __init__(self, method='gram', losser=F.mse_loss):
         super(StyleLoss, self).__init__()
+        self.method = method
         self.losser = losser
-        if method == 'gram':
+        if self.method == 'gram':
             self.pool = gram_matrix
-            self.weighted = lambda x, w: (x * w) * w[:, None]
-        elif method == 'globalavgpool':
+        elif self.method == 'globalavgpool':
             self.pool = lambda x: torch.mean(x, dim=[2, 3])
-            self.weighted = lambda x, w: x * w
 
     def set_target(self, target_feature):
         self.features = target_feature.detach().cpu()
@@ -117,13 +114,15 @@ class StyleLoss(nn.Module):
         self.set_weight_channels(torch.ones([self.features.shape[1]]))
 
     def set_weight_channels(self, ch_wt):
-        self.ch_wt = ch_wt.to(self.target.device)
+        if self.method == 'gram':
+            self.ch_wt = (ch_wt * ch_wt[:, None]).to(self.target.device)
+        elif self.method == 'globalavgpool':
+            self.ch_wt = ch_wt.to(self.target.device)
 
     def forward(self, inp):
         ft = self.pool(inp)
-        #self.loss = self.losser(ft, self.weighted(
-        #    self.target, self.ch_wt))
-        self.loss = self.losser(ft, self.target)
+        self.loss = self.losser(ft, self.target * self.ch_wt)
+        #self.loss = self.losser(ft, self.target)
         return inp
 
 
@@ -161,6 +160,7 @@ class StyleModel(nn.Module):
 
         self.model = self.model[:(i + 1)].to(self.device)
         #self.model.add_module('sigmoid', nn.Sigmoid())
+        self.eval()
 
     def set_target(self, content_img, style_img):
         x = content_img
